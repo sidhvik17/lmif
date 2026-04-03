@@ -1,0 +1,12 @@
+.env
+*.env.*
+__pycache__/
+*.pyc
+chroma_db/
+vector_store/
+models/
+*.bin
+*.gguf
+.DS_Store
+*.key
+secrets/
