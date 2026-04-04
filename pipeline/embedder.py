@@ -13,3 +13,9 @@ def embed_chunks(chunks):
     texts = [c["text"] for c in chunks]
     vectors = model.encode(texts, show_progress_bar=len(texts) > 8)
     return vectors
+
+
+def embed_query(query: str):
+    """Embed a query with BGE instruction prefix for retrieval-aware encoding."""
+    prefixed = f"Represent this sentence for searching relevant passages: {query}"
+    return model.encode(prefixed)

@@ -6,7 +6,7 @@ TESSERACT_PATH = os.environ.get("TESSERACT_CMD") or shutil.which("tesseract") or
     r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 )
 
-EMBEDDING_MODEL   = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL   = "BAAI/bge-small-en-v1.5"
 CHROMA_DB_PATH    = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLLECTION_NAME   = "lmif_collection"
 

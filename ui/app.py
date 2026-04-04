@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from ingestion.ingest_manager import ingest_file
-from pipeline.chunker import chunk_documents
+from pipeline.chunker import chunk_documents, deduplicate_chunks
 from pipeline.embedder import embed_chunks
 from vectorstore.store import add_chunks
 from retrieval.retriever import retrieve
@@ -41,6 +41,11 @@ with tab1:
                 st.warning(f"{f.name}: nothing to index after chunking.")
                 continue
             vectors = embed_chunks(chunks)
+            # Deduplicate near-identical chunks
+            before_count = len(chunks)
+            chunks, vectors = deduplicate_chunks(chunks, vectors)
+            if before_count > len(chunks):
+                st.info(f"Deduplication: {before_count} → {len(chunks)} chunks")
             add_chunks(chunks, vectors)
             st.success(f"✓ {f.name} — {len(chunks)} chunks indexed")
 
@@ -51,9 +56,6 @@ with tab2:
         with st.spinner("Retrieving & generating..."):
             chunks = retrieve(q)
             answer, used = generate(q, chunks)
-        st.markdown(f"### Answer\n{answer}")
-        citations = format_citations(used)
-        if citations:
-            st.markdown("### Citations")
-            for c in citations:
-                st.markdown(f"- {c}")
+        # Format answer with inline citations + footer
+        formatted = format_citations(answer, used)
+        st.markdown(f"### Answer\n{formatted}")

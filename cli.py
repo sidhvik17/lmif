@@ -1,7 +1,7 @@
 import typer
 from rich.console import Console
 from ingestion.ingest_manager import ingest_file, ingest_directory
-from pipeline.chunker import chunk_documents
+from pipeline.chunker import chunk_documents, deduplicate_chunks
 from pipeline.embedder import embed_chunks
 from vectorstore.store import add_chunks
 from retrieval.retriever import retrieve
@@ -25,6 +25,11 @@ def ingest(path: str):
         console.print("[yellow]No text extracted or all segments were empty after chunking.[/yellow]")
         return
     vectors = embed_chunks(chunks)
+    # Deduplicate near-identical chunks
+    before_count = len(chunks)
+    chunks, vectors = deduplicate_chunks(chunks, vectors)
+    if before_count > len(chunks):
+        console.print(f"[dim]Deduplication: {before_count} → {len(chunks)} chunks[/dim]")
     add_chunks(chunks, vectors)
     console.print(f"[green]Done. Ingested {len(chunks)} chunks.[/green]")
 
@@ -35,12 +40,9 @@ def query(q: str):
     console.print(f"\n[cyan]Query:[/cyan] {q}\n")
     chunks = retrieve(q)
     answer, used = generate(q, chunks)
-    console.print(f"[bold green]Answer:[/bold green]\n{answer}\n")
-    citations = format_citations(used)
-    if citations:
-        console.print("[bold yellow]Citations:[/bold yellow]")
-        for c in citations:
-            console.print(f"  - {c}")
+    # Format answer with citation footer
+    formatted = format_citations(answer, used)
+    console.print(f"[bold green]Answer:[/bold green]\n{formatted}\n")
 
 
 if __name__ == "__main__":

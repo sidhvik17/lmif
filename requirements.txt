@@ -17,3 +17,5 @@ Pillow
 torch
 torchvision
 torchaudio
+pydub
+SpeechRecognition
