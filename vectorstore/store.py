@@ -54,12 +54,18 @@ def search(query_vector, k=5):
         q = q.reshape(1, -1)
     n = collection.count()
     if n == 0:
+        print("[SEARCH] Collection is empty — no documents have been indexed yet.")
         return []
+    print(f"[SEARCH] Searching {n} indexed chunks (k={k})...")
     k = min(k, max(n, 1))
     results = collection.query(
         query_embeddings=q.tolist(),
         n_results=k,
+        include=["documents", "metadatas"],
     )
-    docs = results["documents"][0]
-    metas = results["metadatas"][0]
-    return list(zip(docs, metas))
+    docs = results.get("documents") or [[]]
+    metas = results.get("metadatas") or [[]]
+    if not docs[0]:
+        print(f"[SEARCH] Query returned no documents (collection has {n} items).")
+        return []
+    return list(zip(docs[0], metas[0]))

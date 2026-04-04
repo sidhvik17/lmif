@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pytesseract
 import cv2
 from config import TESSERACT_PATH
@@ -9,7 +10,9 @@ if TESSERACT_PATH:
 
 def preprocess_image(filepath):
     """Preprocess image for better OCR: grayscale, denoise, threshold."""
-    img = cv2.imread(filepath)
+    # Use np.fromfile + imdecode to handle paths with spaces/unicode (Windows)
+    buf = np.fromfile(filepath, dtype=np.uint8)
+    img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
     if img is None:
         return None
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
