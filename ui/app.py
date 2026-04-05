@@ -7,7 +7,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from ingestion.ingest_manager import ingest_file
 from pipeline.chunker import chunk_documents, deduplicate_chunks
 from pipeline.embedder import embed_chunks
-from vectorstore.store import add_chunks
+from vectorstore.store import add_chunks, get_count
 from retrieval.retriever import retrieve
 from generation.generator import generate
 from generation.citation_formatter import format_citations
@@ -15,6 +15,9 @@ from generation.citation_formatter import format_citations
 st.set_page_config(page_title="LMIF", page_icon="🧠", layout="wide")
 st.title("🧠 LMIF — Local Multimodal Intelligence Framework")
 st.caption("Offline · Privacy-Preserving · Text + Image + Audio RAG")
+
+# Show collection stats in sidebar
+st.sidebar.metric("Indexed Chunks", get_count())
 
 tab1, tab2 = st.tabs(["📥 Ingest", "🔍 Query"])
 
@@ -48,6 +51,7 @@ with tab1:
                 st.info(f"Deduplication: {before_count} → {len(chunks)} chunks")
             add_chunks(chunks, vectors)
             st.success(f"✓ {f.name} — {len(chunks)} chunks indexed")
+        st.rerun()
 
 with tab2:
     st.subheader("Ask a Question")
@@ -55,6 +59,10 @@ with tab2:
     if st.button("Ask") and q:
         with st.spinner("Retrieving & generating..."):
             chunks = retrieve(q)
+            st.sidebar.write(f"**Retrieved chunks:** {len(chunks)}")
+            if chunks:
+                for i, (text, meta) in enumerate(chunks[:3], 1):
+                    st.sidebar.caption(f"Chunk {i} [{meta.get('modality','?')}]: {text[:120]}...")
             answer, used = generate(q, chunks)
         # Format answer with inline citations + footer
         formatted = format_citations(answer, used)
