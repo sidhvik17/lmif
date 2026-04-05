@@ -4,7 +4,11 @@ import chromadb
 from config import CHROMA_DB_PATH, COLLECTION_NAME
 
 client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-collection = client.get_or_create_collection(COLLECTION_NAME)
+
+
+def _get_collection():
+    """Always fetch a fresh collection reference to avoid stale reads."""
+    return client.get_or_create_collection(COLLECTION_NAME)
 
 
 def _normalize_embeddings(vectors):
@@ -19,6 +23,7 @@ def add_chunks(chunks, vectors):
     if not chunks:
         print("[DB] No chunks to store (nothing to index).")
         return
+    collection = _get_collection()
     ids = [str(uuid.uuid4()) for _ in chunks]
     texts = [c["text"] for c in chunks]
     metas = [_sanitize_metadata(c["metadata"]) for c in chunks]
@@ -31,7 +36,7 @@ def add_chunks(chunks, vectors):
         embeddings=embeddings,
         metadatas=metas,
     )
-    print(f"[DB] Stored {len(chunks)} chunks.")
+    print(f"[DB] Stored {len(chunks)} chunks. Collection now has {collection.count()} total.")
 
 
 def _sanitize_metadata(meta: dict) -> dict:
@@ -47,8 +52,14 @@ def _sanitize_metadata(meta: dict) -> dict:
     return out
 
 
+def get_count():
+    """Return the number of chunks in the collection."""
+    return _get_collection().count()
+
+
 def search(query_vector, k=5):
     """Search ChromaDB for top-k most similar chunks to a query vector."""
+    collection = _get_collection()
     q = np.asarray(query_vector, dtype=np.float32)
     if q.ndim == 1:
         q = q.reshape(1, -1)
@@ -68,4 +79,5 @@ def search(query_vector, k=5):
     if not docs[0]:
         print(f"[SEARCH] Query returned no documents (collection has {n} items).")
         return []
+    print(f"[SEARCH] Retrieved {len(docs[0])} results.")
     return list(zip(docs[0], metas[0]))
