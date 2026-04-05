@@ -16,6 +16,8 @@ def generate(query, chunks):
 
         if mod == "AUDIO":
             header = f"[{i}] (AUDIO: {src} | Timestamp: {page})"
+        elif mod == "IMAGE":
+            header = f"[{i}] (IMAGE — OCR/caption may contain errors: {src} | Page: {page})"
         else:
             header = f"[{i}] ({mod}: {src} | Page: {page})"
 
@@ -23,20 +25,20 @@ def generate(query, chunks):
 
     context = "\n\n---\n\n".join(numbered_parts)
 
-    prompt = f"""You are a precise, citation-aware assistant. Follow these rules strictly:
+    prompt = f"""You are a helpful assistant that answers questions using ONLY the context below.
 
-1. Answer ONLY using the numbered context chunks below.
-2. For EVERY factual claim, cite the source using [chunk_number].
-3. If multiple chunks support a claim, cite all: [1][3].
-4. If the answer is not in any chunk, say "Not found in indexed sources."
-5. Never add information beyond what the chunks contain.
+RULES:
+- Cite every claim with [chunk_number], e.g. [1] or [1][3].
+- IMAGE chunks were extracted via OCR and may have garbled text, wrong characters, or missing spaces. Interpret them as best you can — e.g. "SaTISH" means "SATISH", "Bomk" means "Bank", "W991" could be a misread of digits.
+- AUDIO chunks were auto-transcribed and may have errors too.
+- Always attempt an answer from the context. Only say "Not found in indexed sources." if the context is truly irrelevant.
 
 Context:
 {context}
 
 Question: {query}
 
-Answer (every claim must have a citation):"""
+Answer:"""
 
     try:
         client = ollama.Client(host=OLLAMA_BASE_URL)

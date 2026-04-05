@@ -1,4 +1,5 @@
 import typer
+from typing import Optional
 from rich.console import Console
 from ingestion.ingest_manager import ingest_file, ingest_directory
 from pipeline.chunker import chunk_documents, deduplicate_chunks
@@ -35,10 +36,20 @@ def ingest(path: str):
 
 
 @app.command()
-def query(q: str):
-    """Query the LMIF system."""
-    console.print(f"\n[cyan]Query:[/cyan] {q}\n")
-    chunks = retrieve(q)
+def query(
+    q: str,
+    modality: Optional[str] = typer.Option(None, help="Filter by modality: text, image, audio"),
+    hyde: bool = typer.Option(False, help="Use HyDE query expansion for better recall"),
+):
+    """Query the LMIF system with hybrid dense+sparse retrieval."""
+    console.print(f"\n[cyan]Query:[/cyan] {q}")
+    if modality:
+        console.print(f"[dim]Modality filter: {modality}[/dim]")
+    if hyde:
+        console.print(f"[dim]HyDE query expansion: enabled[/dim]")
+    console.print()
+
+    chunks = retrieve(q, modality_filter=modality, use_hyde=hyde)
     answer, used = generate(q, chunks)
     # Format answer with citation footer
     formatted = format_citations(answer, used)

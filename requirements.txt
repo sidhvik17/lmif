@@ -18,4 +18,5 @@ torch
 torchvision
 torchaudio
 pydub
-SpeechRecognition
+rank-bm25
+transformers
