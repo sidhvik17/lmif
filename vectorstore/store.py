@@ -57,8 +57,14 @@ def get_count():
     return _get_collection().count()
 
 
-def search(query_vector, k=5):
-    """Search ChromaDB for top-k most similar chunks to a query vector."""
+def search(query_vector, k=5, modality_filter=None):
+    """Search ChromaDB for top-k most similar chunks to a query vector.
+
+    Args:
+        query_vector: The query embedding vector.
+        k: Number of results to return.
+        modality_filter: Optional - "text", "image", or "audio" to filter results.
+    """
     collection = _get_collection()
     q = np.asarray(query_vector, dtype=np.float32)
     if q.ndim == 1:
@@ -67,13 +73,17 @@ def search(query_vector, k=5):
     if n == 0:
         print("[SEARCH] Collection is empty — no documents have been indexed yet.")
         return []
-    print(f"[SEARCH] Searching {n} indexed chunks (k={k})...")
+    filter_label = f" [modality={modality_filter}]" if modality_filter else ""
+    print(f"[SEARCH] Searching {n} indexed chunks (k={k}){filter_label}...")
     k = min(k, max(n, 1))
-    results = collection.query(
-        query_embeddings=q.tolist(),
-        n_results=k,
-        include=["documents", "metadatas"],
-    )
+    query_kwargs = {
+        "query_embeddings": q.tolist(),
+        "n_results": k,
+        "include": ["documents", "metadatas"],
+    }
+    if modality_filter:
+        query_kwargs["where"] = {"modality": modality_filter}
+    results = collection.query(**query_kwargs)
     docs = results.get("documents") or [[]]
     metas = results.get("metadatas") or [[]]
     if not docs[0]:

@@ -18,6 +18,15 @@ st.caption("Offline · Privacy-Preserving · Text + Image + Audio RAG")
 
 # Show collection stats in sidebar
 st.sidebar.metric("Indexed Chunks", get_count())
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Retrieval Settings**")
+modality_filter = st.sidebar.selectbox(
+    "Filter by modality",
+    [None, "text", "image", "audio"],
+    format_func=lambda x: "All modalities" if x is None else x.capitalize(),
+)
+use_hyde = st.sidebar.toggle("HyDE query expansion", value=False,
+                              help="Generate a hypothetical answer to improve retrieval recall")
 
 tab1, tab2 = st.tabs(["📥 Ingest", "🔍 Query"])
 
@@ -35,21 +44,22 @@ with tab1:
             os.makedirs(os.path.dirname(tmp), exist_ok=True)
             with open(tmp, "wb") as fp:
                 fp.write(f.getvalue())
-            raw = ingest_file(tmp)
-            if not raw:
-                st.warning(f"{f.name}: no content extracted (unsupported or empty).")
-                continue
-            chunks = chunk_documents(raw)
-            if not chunks:
-                st.warning(f"{f.name}: nothing to index after chunking.")
-                continue
-            vectors = embed_chunks(chunks)
-            # Deduplicate near-identical chunks
-            before_count = len(chunks)
-            chunks, vectors = deduplicate_chunks(chunks, vectors)
-            if before_count > len(chunks):
-                st.info(f"Deduplication: {before_count} → {len(chunks)} chunks")
-            add_chunks(chunks, vectors)
+            with st.spinner(f"Processing {f.name}..."):
+                raw = ingest_file(tmp)
+                if not raw:
+                    st.warning(f"{f.name}: no content extracted (unsupported or empty).")
+                    continue
+                chunks = chunk_documents(raw)
+                if not chunks:
+                    st.warning(f"{f.name}: nothing to index after chunking.")
+                    continue
+                vectors = embed_chunks(chunks)
+                # Deduplicate near-identical chunks
+                before_count = len(chunks)
+                chunks, vectors = deduplicate_chunks(chunks, vectors)
+                if before_count > len(chunks):
+                    st.info(f"Deduplication: {before_count} → {len(chunks)} chunks")
+                add_chunks(chunks, vectors)
             st.success(f"✓ {f.name} — {len(chunks)} chunks indexed")
         st.rerun()
 
@@ -58,11 +68,13 @@ with tab2:
     q = st.text_input("Enter your query")
     if st.button("Ask") and q:
         with st.spinner("Retrieving & generating..."):
-            chunks = retrieve(q)
+            chunks = retrieve(q, modality_filter=modality_filter, use_hyde=use_hyde)
             st.sidebar.write(f"**Retrieved chunks:** {len(chunks)}")
             if chunks:
                 for i, (text, meta) in enumerate(chunks[:3], 1):
-                    st.sidebar.caption(f"Chunk {i} [{meta.get('modality','?')}]: {text[:120]}...")
+                    st.sidebar.caption(
+                        f"Chunk {i} [{meta.get('modality','?')}]: {text[:120]}..."
+                    )
             answer, used = generate(q, chunks)
         # Format answer with inline citations + footer
         formatted = format_citations(answer, used)
