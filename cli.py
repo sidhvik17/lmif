@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 import typer
+from typing import Optional
 from rich.console import Console
 
 from logging_config import setup_logging
