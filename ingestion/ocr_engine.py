@@ -1,39 +1,142 @@
-import os
+import numpy as np
 import pytesseract
-import cv2
+from PIL import Image
 from config import TESSERACT_PATH
 
 if TESSERACT_PATH:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
+# Lazy-loaded models + heavy deps (cv2, easyocr, transformers).
+# Keeps startup fast when OCR not used.
+_easyocr_reader = None
+_caption_model = None
+_caption_processor = None
+_cv2 = None
 
-def preprocess_image(filepath):
-    """Preprocess image for better OCR: grayscale, denoise, threshold."""
-    img = cv2.imread(filepath)
+
+def _get_cv2():
+    """Lazy import cv2. ~50MB, ~1s import cost."""
+    global _cv2
+    if _cv2 is None:
+        import cv2
+        _cv2 = cv2
+    return _cv2
+
+
+def _get_easyocr():
+    global _easyocr_reader
+    if _easyocr_reader is None:
+        import easyocr
+        _easyocr_reader = easyocr.Reader(["en"], gpu=False)
+    return _easyocr_reader
+
+
+def _get_captioner():
+    global _caption_model, _caption_processor
+    if _caption_model is None:
+        from transformers import BlipProcessor, BlipForConditionalGeneration
+        _caption_processor = BlipProcessor.from_pretrained(
+            "Salesforce/blip-image-captioning-base"
+        )
+        _caption_model = BlipForConditionalGeneration.from_pretrained(
+            "Salesforce/blip-image-captioning-base"
+        )
+    return _caption_processor, _caption_model
+
+
+def generate_caption(filepath):
+    """Generate a natural-language caption for an image using BLIP."""
+    try:
+        processor, model = _get_captioner()
+        image = Image.open(filepath).convert("RGB")
+        inputs = processor(image, return_tensors="pt")
+        out = model.generate(**inputs, max_new_tokens=80)
+        caption = processor.decode(out[0], skip_special_tokens=True)
+        return caption.strip()
+    except Exception as e:
+        print(f"[CAPTION] BLIP captioning failed for {filepath}: {e}")
+        return ""
+
+
+def _easyocr_extract(filepath):
+    """Extract text using EasyOCR (better for photos, cards, handwriting)."""
+    try:
+        reader = _get_easyocr()
+        results = reader.readtext(filepath)
+        lines = []
+        for bbox, text, conf in results:
+            if conf > 0.2 and text.strip():
+                lines.append(text.strip())
+        return " ".join(lines)
+    except Exception as e:
+        print(f"[EasyOCR] Failed for {filepath}: {e}")
+        return ""
+
+
+def _tesseract_extract(filepath):
+    """Extract text using Tesseract OCR (better for clean documents)."""
+    cv2 = _get_cv2()
+    buf = np.fromfile(filepath, dtype=np.uint8)
+    img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
     if img is None:
-        return None
+        return ""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     denoised = cv2.fastNlMeansDenoising(gray, h=10)
     _, thresh = cv2.threshold(
         denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
-    return thresh
+    return (pytesseract.image_to_string(thresh) or "").strip()
 
 
 def extract_text_from_image(filepath):
-    """Extract text from image file using Tesseract OCR."""
-    processed = preprocess_image(filepath)
-    if processed is None:
-        print(f"[OCR] Could not read image: {filepath}")
-        return []
-    text = pytesseract.image_to_string(processed)
-    if not (text or "").strip():
-        return []
-    return [{
-        "text": text,
-        "metadata": {
-            "source": filepath,
-            "page": "OCR Region",
-            "modality": "image",
-        },
-    }]
+    """Extract text via dual OCR (EasyOCR + Tesseract) + BLIP caption."""
+    chunks = []
+
+    easy_text = _easyocr_extract(filepath)
+    tess_text = _tesseract_extract(filepath)
+
+    if len(easy_text) >= len(tess_text):
+        primary_text = easy_text
+        secondary_text = tess_text
+    else:
+        primary_text = tess_text
+        secondary_text = easy_text
+
+    if primary_text:
+        chunks.append({
+            "text": primary_text,
+            "metadata": {
+                "source": filepath,
+                "page": "OCR Region",
+                "modality": "image",
+            },
+        })
+
+    if secondary_text and len(secondary_text) > 20:
+        overlap = sum(1 for w in secondary_text.split() if w in primary_text)
+        if overlap < len(secondary_text.split()) * 0.5:
+            chunks.append({
+                "text": secondary_text,
+                "metadata": {
+                    "source": filepath,
+                    "page": "OCR Region (alt)",
+                    "modality": "image",
+                },
+            })
+
+    caption = generate_caption(filepath)
+    if caption:
+        if not primary_text or caption.lower() not in primary_text.lower():
+            chunks.append({
+                "text": f"[Image description]: {caption}",
+                "metadata": {
+                    "source": filepath,
+                    "page": "BLIP Caption",
+                    "modality": "image",
+                },
+            })
+
+    if not chunks:
+        print(f"[OCR] Could not extract text or caption from: {filepath}")
+
+    return chunks

@@ -1,21 +1,31 @@
-pymupdf
-python-docx
-pytesseract
-easyocr
-openai-whisper
-langchain
-langchain-community
-langchain-text-splitters
-sentence-transformers
-chromadb
-ollama
-streamlit
-rich
-typer
-opencv-python
-Pillow
-torch
-torchvision
-torchaudio
-pydub
-SpeechRecognition
+# Pinned lower bounds protect against silent upstream breakages.
+# If you hit install conflicts, relax the minimum but pin the resolved
+# version in your environment (pip freeze > requirements.lock).
+pymupdf>=1.24
+python-docx>=1.1
+pytesseract>=0.3.10
+easyocr>=1.7
+openai-whisper>=20231117
+langchain>=0.2
+langchain-community>=0.2
+langchain-text-splitters>=0.2
+sentence-transformers>=2.7
+chromadb>=0.5
+ollama>=0.3
+streamlit>=1.35
+rich>=13.7
+typer>=0.12
+opencv-python>=4.9
+Pillow>=10.3
+torch>=2.2
+torchvision>=0.17
+torchaudio>=2.2
+pydub>=0.25
+rank-bm25>=0.2.2
+transformers>=4.40
+
+# Optional — structured PDF parsing (tables, headings, layout) via Docling.
+# Heavy: pulls layout models (~500MB) on first use. If installed, parse_pdf
+# prefers Docling; otherwise it falls back to PyMuPDF automatically.
+# Uncomment to enable.
+# docling>=2.0

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: System deps (tesseract, ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tesseract-ocr ffmpeg
+
+      - name: Install dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff lint (non-blocking)
+        continue-on-error: true
+        run: ruff check . --output-format=github
+
+      - name: Syntax parse all .py files
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+          fails = []
+          for p in pathlib.Path(".").rglob("*.py"):
+              if any(s in p.parts for s in ("venv", ".venv", "__pycache__")):
+                  continue
+              try:
+                  ast.parse(p.read_text(encoding="utf-8"))
+              except SyntaxError as e:
+                  fails.append(f"{p}: {e}")
+          if fails:
+              print("\n".join(fails))
+              sys.exit(1)
+          print("syntax OK")
+          PY
+
+      - name: Install runtime deps (for unit tests only)
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        env:
+          LMIF_LOG_LEVEL: WARNING
+        run: pytest -q

@@ -1,59 +1,93 @@
-import os
-import tempfile
-import speech_recognition as sr
-from pydub import AudioSegment
+import whisper
+from config import WHISPER_MODEL, WHISPER_MERGE_WINDOW
+
+# Load Whisper model once at module level
+_model = None
 
 
-def convert_to_wav(filepath):
-    """Convert any audio format to PCM WAV."""
-    ext = os.path.splitext(filepath)[1].lower()
-    if ext == ".wav":
-        return filepath, False
-    
-    audio = AudioSegment.from_file(filepath)
-    wav_path = os.path.join(tempfile.gettempdir(), "lmif_temp.wav")
-    audio.export(wav_path, format="wav")
-    return wav_path, True
+def _get_model():
+    global _model
+    if _model is None:
+        _model = whisper.load_model(WHISPER_MODEL)
+    return _model
+
+
+def _merge_segments(segments, window=WHISPER_MERGE_WINDOW):
+    """Merge Whisper segments into larger chunks by time window.
+
+    Prevents tiny 1-2 second chunks that lack context for the LLM.
+    """
+    if not segments:
+        return []
+
+    merged = []
+    buf_texts = []
+    buf_start = int(segments[0]["start"])
+    prev_end = buf_start
+
+    for seg in segments:
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        end = int(seg["end"])
+
+        # If adding this segment exceeds window, flush buffer
+        if buf_texts and (end - buf_start) > window:
+            merged.append({
+                "text": " ".join(buf_texts),
+                "start": buf_start,
+                "end": prev_end,
+            })
+            buf_texts = []
+            buf_start = int(seg["start"])
+
+        buf_texts.append(text)
+        prev_end = end
+
+    # Flush remaining
+    if buf_texts:
+        merged.append({
+            "text": " ".join(buf_texts),
+            "start": buf_start,
+            "end": int(segments[-1]["end"]),
+        })
+
+    return merged
 
 
 def transcribe_audio(filepath):
-    """Transcribe audio file using SpeechRecognition."""
-    recognizer = sr.Recognizer()
+    """Transcribe audio file using OpenAI Whisper (fully offline)."""
+    model = _get_model()
+    result = model.transcribe(filepath, verbose=False)
 
-    # Convert mp3/other formats to WAV
-    wav_path, converted = convert_to_wav(filepath)
+    segments = result.get("segments", [])
+    if not segments:
+        text = result.get("text", "").strip()
+        if text:
+            return [{
+                "text": text,
+                "metadata": {
+                    "source": filepath,
+                    "page": "00:00 - full",
+                    "modality": "audio",
+                },
+            }]
+        return []
+
+    # Merge small segments into ~30s windows for better LLM context
+    merged = _merge_segments(segments)
 
     chunks = []
-    try:
-        with sr.AudioFile(wav_path) as source:
-            duration = source.DURATION
-            # Process in 30-second segments
-            segment_len = 30
-            offset = 0.0
-            while offset < duration:
-                length = min(segment_len, duration - offset)
-                audio_data = recognizer.record(source, duration=length)
-                try:
-                    text = recognizer.recognize_google(audio_data)
-                except sr.UnknownValueError:
-                    text = ""
-                except sr.RequestError:
-                    text = "[Speech recognition unavailable]"
-
-                if text.strip():
-                    start_m, start_s = divmod(int(offset), 60)
-                    end_m, end_s = divmod(int(offset + length), 60)
-                    chunks.append({
-                        "text": text.strip(),
-                        "metadata": {
-                            "source": filepath,
-                            "page": f"{start_m:02d}:{start_s:02d} - {end_m:02d}:{end_s:02d}",
-                            "modality": "audio",
-                        },
-                    })
-                offset += segment_len
-    finally:
-        if converted and os.path.exists(wav_path):
-            os.remove(wav_path)
+    for group in merged:
+        start_m, start_s = divmod(group["start"], 60)
+        end_m, end_s = divmod(group["end"], 60)
+        chunks.append({
+            "text": group["text"],
+            "metadata": {
+                "source": filepath,
+                "page": f"{start_m:02d}:{start_s:02d} - {end_m:02d}:{end_s:02d}",
+                "modality": "audio",
+            },
+        })
 
     return chunks

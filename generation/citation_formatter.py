@@ -1,15 +1,16 @@
+import os
 import re
 
 
 def format_citations(answer: str, chunks: list) -> str:
     """
     Post-process the LLM answer to convert [chunk_number] references
-    into human-readable citations with a footer.
+    into human-readable citations with a footer showing filename, modality, and page/timestamp.
     """
     citation_map = {}
     for i, (text, meta) in enumerate(chunks, 1):
         mod = meta.get("modality", "text")
-        src = meta.get("source", "unknown")
+        src = os.path.basename(meta.get("source", "unknown"))
         page = meta.get("page", "")
 
         if mod == "audio":
