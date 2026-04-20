@@ -1,12 +1,8 @@
-import os
 import whisper
-from config import WHISPER_MODEL
+from config import WHISPER_MODEL, WHISPER_MERGE_WINDOW
 
 # Load Whisper model once at module level
 _model = None
-
-# Merge segments into groups of this many seconds
-MERGE_WINDOW = 30
 
 
 def _get_model():
@@ -16,7 +12,7 @@ def _get_model():
     return _model
 
 
-def _merge_segments(segments, window=MERGE_WINDOW):
+def _merge_segments(segments, window=WHISPER_MERGE_WINDOW):
     """Merge Whisper segments into larger chunks by time window.
 
     Prevents tiny 1-2 second chunks that lack context for the LLM.
@@ -27,6 +23,7 @@ def _merge_segments(segments, window=MERGE_WINDOW):
     merged = []
     buf_texts = []
     buf_start = int(segments[0]["start"])
+    prev_end = buf_start
 
     for seg in segments:
         text = seg.get("text", "").strip()
@@ -39,12 +36,13 @@ def _merge_segments(segments, window=MERGE_WINDOW):
             merged.append({
                 "text": " ".join(buf_texts),
                 "start": buf_start,
-                "end": int(segments[segments.index(seg) - 1]["end"]) if segments.index(seg) > 0 else end,
+                "end": prev_end,
             })
             buf_texts = []
             buf_start = int(seg["start"])
 
         buf_texts.append(text)
+        prev_end = end
 
     # Flush remaining
     if buf_texts:

@@ -1,23 +1,32 @@
-import os
 import numpy as np
 import pytesseract
-import cv2
-import easyocr
 from PIL import Image
 from config import TESSERACT_PATH
 
 if TESSERACT_PATH:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
-# Lazy-loaded models
+# Lazy-loaded models + heavy deps (cv2, easyocr, transformers).
+# Keeps startup fast when OCR not used.
 _easyocr_reader = None
 _caption_model = None
 _caption_processor = None
+_cv2 = None
+
+
+def _get_cv2():
+    """Lazy import cv2. ~50MB, ~1s import cost."""
+    global _cv2
+    if _cv2 is None:
+        import cv2
+        _cv2 = cv2
+    return _cv2
 
 
 def _get_easyocr():
     global _easyocr_reader
     if _easyocr_reader is None:
+        import easyocr
         _easyocr_reader = easyocr.Reader(["en"], gpu=False)
     return _easyocr_reader
 
@@ -54,7 +63,6 @@ def _easyocr_extract(filepath):
     try:
         reader = _get_easyocr()
         results = reader.readtext(filepath)
-        # Filter by confidence and join text
         lines = []
         for bbox, text, conf in results:
             if conf > 0.2 and text.strip():
@@ -67,6 +75,7 @@ def _easyocr_extract(filepath):
 
 def _tesseract_extract(filepath):
     """Extract text using Tesseract OCR (better for clean documents)."""
+    cv2 = _get_cv2()
     buf = np.fromfile(filepath, dtype=np.uint8)
     img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
     if img is None:
@@ -83,13 +92,9 @@ def extract_text_from_image(filepath):
     """Extract text via dual OCR (EasyOCR + Tesseract) + BLIP caption."""
     chunks = []
 
-    # 1. EasyOCR (primary — better for photos, cards, real-world images)
     easy_text = _easyocr_extract(filepath)
-
-    # 2. Tesseract (secondary — better for clean scanned docs)
     tess_text = _tesseract_extract(filepath)
 
-    # Use the longer result as primary, keep both if substantially different
     if len(easy_text) >= len(tess_text):
         primary_text = easy_text
         secondary_text = tess_text
@@ -107,7 +112,6 @@ def extract_text_from_image(filepath):
             },
         })
 
-    # Add secondary OCR if it has substantially different content
     if secondary_text and len(secondary_text) > 20:
         overlap = sum(1 for w in secondary_text.split() if w in primary_text)
         if overlap < len(secondary_text.split()) * 0.5:
@@ -120,7 +124,6 @@ def extract_text_from_image(filepath):
                 },
             })
 
-    # 3. BLIP caption (works for ALL images including photos/diagrams)
     caption = generate_caption(filepath)
     if caption:
         if not primary_text or caption.lower() not in primary_text.lower():

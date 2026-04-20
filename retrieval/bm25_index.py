@@ -3,16 +3,36 @@
 import re
 from rank_bm25 import BM25Okapi
 from vectorstore.store import _get_collection
+from logging_config import get_logger
+
+log = get_logger(__name__)
 
 
 _bm25 = None
 _bm25_docs = None
 _bm25_count = None
 
+# Common English stopwords that dilute BM25 scores for indirect queries
+_STOPWORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "above", "below", "between", "out", "off", "over",
+    "under", "again", "further", "then", "once", "here", "there", "when",
+    "where", "why", "how", "all", "each", "every", "both", "few", "more",
+    "most", "other", "some", "such", "no", "nor", "not", "only", "own",
+    "same", "so", "than", "too", "very", "just", "about", "and", "but",
+    "or", "if", "while", "that", "this", "it", "its", "i", "me", "my",
+    "we", "our", "you", "your", "he", "him", "his", "she", "her", "they",
+    "them", "their", "what", "which", "who", "whom",
+})
+
 
 def _tokenize(text):
-    """Simple whitespace + punctuation tokenizer."""
-    return re.findall(r"\w+", text.lower())
+    """Tokenize with stopword removal for better BM25 precision."""
+    tokens = re.findall(r"\w+", text.lower())
+    return [t for t in tokens if t not in _STOPWORDS]
 
 
 def _build_index():
@@ -35,7 +55,7 @@ def _build_index():
     tokenized = [_tokenize(d) for d in docs]
     _bm25 = BM25Okapi(tokenized)
     _bm25_count = n
-    print(f"[BM25] Built sparse index over {n} documents.")
+    log.info("Built sparse index over %d documents.", n)
 
 
 def bm25_search(query, k=10):

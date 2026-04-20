@@ -3,10 +3,18 @@
 __pycache__/
 *.pyc
 chroma_db/
+cache/
 vector_store/
 models/
 *.bin
 *.gguf
 .DS_Store
+desktop.ini
+Thumbs.db
+venv/
+.venv/
 *.key
 secrets/
+.claude/worktrees/
+# Added by code-review-graph
+.code-review-graph/

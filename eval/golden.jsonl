@@ -1,0 +1,4 @@
+{"query": "What is the patient name on the lab report?", "expected_sources": ["LabreportNew.aspx.pdf"], "expected_modalities": ["text"], "notes": "Tests PDF text extraction + retrieval"}
+{"query": "What does the WhatsApp audio say?", "expected_sources": ["WhatsApp Audio 2026-04-03 at 5.41.55 PM.mp3"], "expected_modalities": ["audio"], "notes": "Tests ASR + audio prefix routing"}
+{"query": "What is written on the card in the image?", "expected_sources": ["WhatsApp Image 2026-03-23 at 6.22.07 PM.jpeg", "WhatsApp Image 2026-04-03 at 5.45.48 PM.jpeg"], "expected_modalities": ["image"], "notes": "Tests OCR/BLIP + image prefix"}
+{"query": "summarize everything you have indexed", "expected_sources": [], "expected_modalities": ["text", "image", "audio"], "notes": "Broad query — expects all modalities represented in top-k"}
