@@ -118,12 +118,13 @@ def plot_latency_vs_size(ingest_rows):
     for m in sorted(set(mods)):
         xs = [s for s, mm in zip(sizes, mods) if mm == m]
         ys = [t for t, mm in zip(times, mods) if mm == m]
-        plt.scatter(xs, ys, c=colors.get(m, "gray"), label=m, s=80,
-                    edgecolors="black", linewidth=0.5)
+        plt.scatter(xs, ys, c=colors.get(m, "gray"), label=m, s=140,
+                    edgecolors="black", linewidth=1.5)
     if len(sizes) >= 2:
         z = np.polyfit(sizes, times, 1)
         xx = np.linspace(min(sizes), max(sizes), 50)
-        plt.plot(xx, np.polyval(z, xx), "--", color="gray", alpha=0.7,
+        plt.plot(xx, np.polyval(z, xx), "--", color="gray", alpha=0.85,
+                 linewidth=2.8,
                  label=f"linear fit (slope={z[0]:.4f} s/KB)")
     plt.xlabel("File size (KB)")
     plt.ylabel("End-to-end processing latency (s)")
@@ -146,13 +147,13 @@ def plot_ingest_vs_length(ingest_rows):
     for m in sorted(set(mods)):
         px = [x for x, mm in zip(xs, mods) if mm == m]
         py = [y for y, mm in zip(ys, mods) if mm == m]
-        plt.scatter(px, py, c=colors.get(m, "gray"), label=m, s=80,
-                    edgecolors="black", linewidth=0.5)
+        plt.scatter(px, py, c=colors.get(m, "gray"), label=m, s=140,
+                    edgecolors="black", linewidth=1.5)
     if len(xs) >= 2:
         z = np.polyfit(xs, ys, 1)
         xxs = np.linspace(min(xs), max(xs), 50)
-        plt.plot(xxs, np.polyval(z, xxs), "--", color="gray", alpha=0.7,
-                 label="linear fit")
+        plt.plot(xxs, np.polyval(z, xxs), "--", color="gray", alpha=0.85,
+                 linewidth=2.8, label="linear fit")
     plt.xlabel("Extracted text length (characters)")
     plt.ylabel("Ingestion time (s)")
     plt.title("Ingestion Time vs Extracted Text Length")
@@ -184,8 +185,8 @@ def plot_pca_embeddings():
         if len(pts) == 0:
             continue
         plt.scatter(pts[:, 0], pts[:, 1], c=colors.get(m, "gray"),
-                    label=f"{m} (n={len(pts)})", s=90,
-                    edgecolors="black", linewidth=0.5, alpha=0.85)
+                    label=f"{m} (n={len(pts)})", s=160,
+                    edgecolors="black", linewidth=1.5, alpha=0.9)
     ev = pca.explained_variance_ratio_
     plt.xlabel(f"PC1 ({ev[0]*100:.1f}% var)")
     plt.ylabel(f"PC2 ({ev[1]*100:.1f}% var)")

@@ -1,20 +1,57 @@
+# ── Environment & Secrets ──────────────────────────────
 .env
 *.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# ── Python ─────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual Environments ──────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Testing & Linting Caches ─────────────────────────
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ── Local Data & Model Artifacts ─────────────────────
 chroma_db/
 cache/
 vector_store/
 models/
+data/
 *.bin
 *.gguf
+
+# ── IDE & Editor Configs ─────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS Files ─────────────────────────────────────────
 .DS_Store
 desktop.ini
 Thumbs.db
-venv/
-.venv/
-*.key
-secrets/
-.claude/worktrees/
-# Added by code-review-graph
+
+# ── Claude / MCP (local agent configs) ──────────────
+.claude/
+.mcp.json
 .code-review-graph/
+
+# ── Agent Artifacts (not project source) ─────────────
+implementation_plan.md
