@@ -52,6 +52,11 @@ Thumbs.db
 .claude/
 .mcp.json
 .code-review-graph/
+CLAUDE.md
 
 # ── Agent Artifacts (not project source) ─────────────
 implementation_plan.md
+
+# ── Dev / Benchmark Scripts (not runtime source) ─────
+run_benchmark.py
+replot_benchmark.py
